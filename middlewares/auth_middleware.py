@@ -3,9 +3,8 @@ from aiogram.types import Message, CallbackQuery
 from typing import Callable, Dict, Any, List
 import logging
 import os
-import asyncpg  # Импортируем asyncpg
-from dotenv import load_dotenv
-load_dotenv()
+import asyncpg
+
 # Путь к вашей базе данных пользователей Telegram (PostgreSQL connection string)
 USERS_DB_URL = os.getenv("TELEGRAM_USERS_DB_URL")
 
@@ -23,14 +22,16 @@ async def create_users_table():
     conn = None
     try:
         conn = await asyncpg.connect(USERS_DB_URL)
+        # Добавляем поле phone_number TEXT DEFAULT NULL
         await conn.execute("""
                            CREATE TABLE IF NOT EXISTS users
                            (
-                               telegram_id        BIGINT PRIMARY KEY,                     -- BIGINT для Telegram ID
+                               telegram_id        BIGINT PRIMARY KEY,
                                username           TEXT,
                                first_name         TEXT,
                                last_name          TEXT,
-                               is_allowed         BOOLEAN                  DEFAULT FALSE, -- BOOLEAN для статуса разрешения
+                               phone_number       TEXT                     DEFAULT NULL, -- <-- НОВОЕ ПОЛЕ
+                               is_allowed         BOOLEAN                  DEFAULT FALSE,
                                registration_date  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                                last_activity_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                            );
@@ -46,6 +47,7 @@ async def create_users_table():
 
 
 # Асинхронная функция для сохранения или обновления информации о пользователе
+# Phone_number не передается в этой функции, так как будет управляться вручную
 async def save_or_update_user_info(telegram_id: int, username: str,
                                    first_name: str, last_name: str):
     if not USERS_DB_URL:
@@ -57,8 +59,8 @@ async def save_or_update_user_info(telegram_id: int, username: str,
     try:
         conn = await asyncpg.connect(USERS_DB_URL)
 
-        # Используем INSERT ... ON CONFLICT для атомарной операции
-        # Если telegram_id уже существует, обновляем поля, иначе вставляем новую запись
+        # Обновляем запрос INSERT ... ON CONFLICT
+        # Обратите внимание, phone_number здесь не упоминается
         await conn.execute("""
                            INSERT INTO users (telegram_id, username, first_name, last_name, last_activity_date)
                            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
@@ -91,13 +93,13 @@ async def is_user_allowed(telegram_id: int) -> bool:
         conn = await asyncpg.connect(USERS_DB_URL)
         result = await conn.fetchval(
             "SELECT is_allowed FROM users WHERE telegram_id = $1;", telegram_id)
-        if result is None:  # Пользователь не найден в БД
+        if result is None:
             return False
-        return result  # is_allowed - это BOOLEAN, возвращается True/False напрямую
+        return result
     except Exception as e:
         logger.error(
             f"Ошибка при проверке статуса разрешения для пользователя {telegram_id} в PostgreSQL: {e}")
-        return False  # В случае ошибки лучше отказать в доступе по умолчанию
+        return False
     finally:
         if conn:
             await conn.close()
@@ -116,16 +118,12 @@ async def set_user_allowed_status(telegram_id: int, status: bool) -> bool:
         result = await conn.execute(
             "UPDATE users SET is_allowed = $1 WHERE telegram_id = $2;", status,
             telegram_id)
-        if result == "UPDATE 1":  # Если запись была обновлена
+        if result == "UPDATE 1":
             logger.info(
                 f"Статус доступа для пользователя {telegram_id} установлен на {status}")
             return True
         logger.warning(
             f"Пользователь {telegram_id} не найден для изменения статуса.")
-        return False
-    except Exception as e:
-        logger.error(
-            f"Ошибка при установке статуса доступа для пользователя {telegram_id} в PostgreSQL: {e}")
         return False
     finally:
         if conn:
@@ -142,11 +140,12 @@ async def get_user_info(telegram_id: int) -> Dict[str, Any] | None:
     conn = None
     try:
         conn = await asyncpg.connect(USERS_DB_URL)
+        # Добавляем phone_number в SELECT
         row = await conn.fetchrow(
-            "SELECT telegram_id, username, first_name, last_name, is_allowed, registration_date, last_activity_date FROM users WHERE telegram_id = $1;",
+            "SELECT telegram_id, username, first_name, last_name, phone_number, is_allowed, registration_date, last_activity_date FROM users WHERE telegram_id = $1;",
             telegram_id)
         if row:
-            return dict(row)  # Преобразуем Record в dict
+            return dict(row)
         return None
     except Exception as e:
         logger.error(
@@ -167,13 +166,50 @@ async def get_all_users() -> List[Dict[str, Any]]:
     conn = None
     try:
         conn = await asyncpg.connect(USERS_DB_URL)
+        # Добавляем phone_number в SELECT
         rows = await conn.fetch(
-            "SELECT telegram_id, username, first_name, last_name, is_allowed, registration_date, last_activity_date FROM users ORDER BY registration_date DESC;")
-        return [dict(row) for row in
-                rows]  # Преобразуем список Records в список dict
+            "SELECT telegram_id, username, first_name, last_name, phone_number, is_allowed, registration_date, last_activity_date FROM users ORDER BY registration_date DESC;")
+        return [dict(row) for row in rows]
     except Exception as e:
         logger.error(f"Ошибка при получении списка всех пользователей: {e}")
         return []
+    finally:
+        if conn:
+            await conn.close()
+
+
+# НОВАЯ ФУНКЦИЯ (или ОБНОВЛЕННАЯ): Для обновления только номера телефона
+# Эта функция будет вызываться вами вручную, или через админ-интерфейс,
+# а не автоматически ботом
+async def update_user_phone_number(telegram_id: int,
+                                   phone_number: str | None) -> bool:
+    if not USERS_DB_URL:
+        logger.error(
+            "TELEGRAM_USERS_DB_URL не установлен. Обновление номера телефона невозможно.")
+        return False
+
+    conn = None
+    try:
+        conn = await asyncpg.connect(USERS_DB_URL)
+        # Если phone_number None, то это значит, что мы хотим установить его в NULL
+        # Если phone_number пустая строка, то это тоже может быть NULL
+        sql_phone_number = phone_number if phone_number else None
+
+        result = await conn.execute(
+            "UPDATE users SET phone_number = $1 WHERE telegram_id = $2;",
+            sql_phone_number, telegram_id)
+
+        if result == "UPDATE 1":
+            logger.info(
+                f"Номер телефона для пользователя {telegram_id} обновлен до {phone_number}.")
+            return True
+        logger.warning(
+            f"Пользователь {telegram_id} не найден для обновления номера телефона.")
+        return False
+    except Exception as e:
+        logger.error(
+            f"Ошибка при обновлении номера телефона для пользователя {telegram_id} в PostgreSQL: {e}")
+        return False
     finally:
         if conn:
             await conn.close()
@@ -183,8 +219,6 @@ async def get_all_users() -> List[Dict[str, Any]]:
 class AuthUserMiddleware(BaseMiddleware):
     def __init__(self):
         super().__init__()
-        # Примечание: create_users_table() теперь вызывается в main.py, чтобы гарантировать,
-        # что она завершится до начала polling'а бота.
 
     async def __call__(
             self,
@@ -195,10 +229,7 @@ class AuthUserMiddleware(BaseMiddleware):
         user = event.from_user
         user_id = user.id
 
-        # Сохраняем/обновляем информацию о пользователе при каждом взаимодействии
-        # Проверяем на None, так как username, first_name, last_name могут быть None
-        # asyncpg не любит None для TEXT полей, если они not null, но мы их сделали nullable,
-        # поэтому None допустим. Однако пустая строка более универсальна для большинства БД.
+        # Вызываем save_or_update_user_info без параметра phone_number
         await save_or_update_user_info(
             user_id,
             user.username,
@@ -206,12 +237,9 @@ class AuthUserMiddleware(BaseMiddleware):
             user.last_name if user.last_name else ''
         )
 
-        # Проверяем статус разрешения пользователя
         if await is_user_allowed(user_id):
-            # Если пользователь разрешен, передаем управление следующему обработчику
             return await handler(event, data)
         else:
-            # Если пользователь не разрешен, отправляем ему сообщение и прекращаем обработку
             if isinstance(event, Message):
                 await event.answer(
                     "У вас нет доступа к этому боту. Пожалуйста, свяжитесь с администратором.")
@@ -221,4 +249,4 @@ class AuthUserMiddleware(BaseMiddleware):
                 await event.answer("Доступ запрещен.")
             logger.warning(
                 f"Неавторизованная попытка доступа от пользователя: {user_id} ({user.full_name})")
-            return  # Прекращаем обработку
+            return
