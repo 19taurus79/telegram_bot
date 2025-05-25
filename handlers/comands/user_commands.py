@@ -19,15 +19,9 @@ class BotStates(StatesGroup):
     waiting_for_product_selection = State()
     waiting_for_submissions_nomenclature = State()
     waiting_for_submissions_product_selection = State()
-    # Дополнительное состояние для временного хранения ID продукта, если нужно
-    # Хотя в данном случае мы можем использовать данные текущего состояния.
 
 
-
-
-
-## Основное меню и команды
-
+# Основное меню и команды
 @router.message(CommandStart())
 async def cmd_start(message: types.Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -66,11 +60,7 @@ async def cmd_help(message: types.Message):
         "Я могу помочь тебе с этим и тем. Попробуй отправить мне сообщение или выбери опцию из меню!")
 
 
-
-
-
-## Поиск остатков (`/remains`)
-
+# Поиск остатков (`/remains`)
 @router.message(Command("remains"))
 async def cmd_remains_start(message: types.Message, state: FSMContext):
     await message.delete()
@@ -130,6 +120,8 @@ async def process_product_selection(callback_query: types.CallbackQuery,
     """
     Обрабатывает выбор продукта из инлайн-клавиатуры и выводит остатки.
     Добавляет кнопку "Показать у кого под заявками".
+    Общее количество (Бух. и Склад), количество под заявками и статус "свободный/нет" выводятся всегда.
+    Если свободный остаток < 0, то отображается как 0.00.
     """
     await callback_query.answer("Ищу остатки...")
     product_uuid = callback_query.data.split(':')[1]
@@ -145,11 +137,57 @@ async def process_product_selection(callback_query: types.CallbackQuery,
             return
 
         remains_for_product = await get_remains(product_entry[0]['id'])
+        submissions_for_product = await get_submissions(
+            product_entry[0]['id'])  # Получаем данные по заявкам
 
         response_parts = []
+
         if remains_for_product:
             response_parts.append(
                 f"📦 <b><u>*Остатки для продукта: {product_entry[0]['product']}*</u></b>\n")
+
+            # Расчет общего количества (Бух. и Склад) - теперь всегда выводится
+            total_buh = 0
+            total_skl = 0
+            for r in remains_for_product:
+                try:
+                    total_buh += float(r.get('buh', 0))
+                    total_skl += float(r.get('skl', 0))
+                except (ValueError, TypeError):
+                    pass
+
+            response_parts.append(
+                f"  📊 <b>Общее наличие (Бух.):</b> <code>{total_buh:.2f}</code>\n")
+            response_parts.append(
+                f"  📊 <b>Общее наличие (Склад):</b> <code>{total_skl:.2f}</code>\n")
+
+            # Расчет и вывод количества под заявками и свободного остатка (всегда)
+            total_submissions_quantity = 0
+            if submissions_for_product:
+                for s in submissions_for_product:
+                    try:
+                        total_submissions_quantity += float(
+                            s.get('different', 0))
+                    except (ValueError, TypeError):
+                        pass
+
+            response_parts.append(
+                f"  📝 <b>Под заявками:</b> <code>{total_submissions_quantity:.2f}</code>\n")
+
+            free_stock = total_skl - total_submissions_quantity  # Используем total_skl, который теперь всегда подсчитан
+            # Если свободный остаток меньше нуля, устанавливаем его в 0
+            if free_stock < 0:
+                free_stock = 0
+
+            free_stock_status = "✅ Есть свободный" if free_stock > 0 else "❌ Нет свободного"
+            response_parts.append(
+                f"  ➡️ <b>Свободный остаток:</b> <code>{free_stock:.2f}</code> ({free_stock_status})\n\n")
+
+            # Добавляем заголовок "Детали по партиям" только если их больше одной
+            if len(remains_for_product) > 1:
+                response_parts.append("<b>Детали по партиям:</b>\n")
+
+            # Вывод по партиям
             for r in remains_for_product:
                 if r['line_of_business'] in ['Власне виробництво насіння',
                                              'Насіння']:
@@ -173,20 +211,16 @@ async def process_product_selection(callback_query: types.CallbackQuery,
             response_parts.append(f"📦 *Продукт: {product_entry[0]['product']}*")
             response_parts.append("  _Остатков не найдено._")
 
-        final_response = "".join(
-            response_parts)  # Changed from "\n".join() to "".join() for consistency with HTML
+        final_response = "".join(response_parts)
 
-        # --- ДОБАВЛЕНИЕ КНОПКИ "ПОКАЗАТЬ ЗАЯВКИ" ---
+        # Добавление кнопки "ПОКАЗАТЬ ЗАЯВКИ"
         builder = InlineKeyboardBuilder()
 
-        # СОХРАНЯЕМ product_uuid в состоянии FSM
         await state.update_data(current_product_uuid=product_uuid)
 
-        # CALLBACK_DATA ТЕПЕРЬ ПРОСТО МАРКЕР, БЕЗ UUID, ЧТОБЫ УЛОЖИТЬСЯ В 64 БАЙТА
         builder.button(
             text="👉 Показать у кого под заявками",
             callback_data="show_submissions_for_last_viewed_product"
-            # Сокращенная callback_data
         )
 
         if len(final_response) > 4000:
@@ -208,10 +242,7 @@ async def process_product_selection(callback_query: types.CallbackQuery,
         pass
 
 
-
-
-## Поиск заявок (`/orders`)
-
+# Поиск заявок (`/orders`)
 @router.message(Command("orders"))
 async def cmd_submissions_start(message: types.Message, state: FSMContext):
     await message.delete()
@@ -337,11 +368,7 @@ async def process_submissions_product_selection(
                                                 parse_mode=ParseMode.HTML)
 
 
-
-
-
-## Новый хендлер для перехода к заявкам из остатков (МОДИФИЦИРОВАН)
-
+# Новый хендлер для перехода к заявкам из остатков
 @router.callback_query(
     lambda c: c.data == 'show_submissions_for_last_viewed_product')
 async def show_submissions_for_product(callback_query: types.CallbackQuery,
@@ -352,7 +379,6 @@ async def show_submissions_for_product(callback_query: types.CallbackQuery,
     """
     await callback_query.answer("Загружаю заявки...")
 
-    # Извлекаем UUID продукта из FSMContext
     data = await state.get_data()
     product_uuid = data.get('current_product_uuid')
 
@@ -411,16 +437,12 @@ async def show_submissions_for_product(callback_query: types.CallbackQuery,
         pass
 
 
-
-
-
-## Обработка остальных сообщений
-
+# Обработка остальных сообщений
 @router.message()
 async def echo_message(message: types.Message):
     if message.text:
         await message.answer(
-            "Для отримання потрібної інформації, скористайтеся кнопкою ' ☰ ', вона ліворуч",
+            "Для отримання потрібної інформації, скористайтеся кнопкой ' ☰ ', она леворуч",
             parse_mode=ParseMode.HTML)
     else:
         await message.answer("Я получил сообщение, но оно не содержит текста.")
