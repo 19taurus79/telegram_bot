@@ -63,7 +63,7 @@ async def cmd_start(message: types.Message):
 @router.message(Command("admin"))
 async def cmd_admin_menu(message: types.Message):
     if not is_admin(message.from_user.id):
-        await message.answer("У вас нет прав для доступа к админ-меню.")
+        await message.answer("У Вас нема прав для доступу к адмін-меню.")
         logger.warning(
             f"Неавторизованная попытка доступа к /admin от {message.from_user.id}")
         return
@@ -72,7 +72,7 @@ async def cmd_admin_menu(message: types.Message):
 
     # Создаем админские команды для меню Telegram
     admin_commands = [
-        BotCommand(command="start", description="🏠 Главное меню"),
+        # BotCommand(command="start", description="🏠 Главное меню"),
         BotCommand(command="list_users", description="👤 Список пользователей"),
         BotCommand(command="allow_user", description="✅ Разрешить доступ"),
         BotCommand(command="disallow_user", description="❌ Запретить доступ"),
@@ -110,7 +110,7 @@ async def cmd_set_default_commands(message: types.Message):
         # BotCommand(command="help", description="❓ Получить помощь"),
         # BotCommand(command="settings", description="⚙️ Изменить настройки"),
         # BotCommand(command="about", description="ℹ️ О боте"),
-        BotCommand(command="admin", description="🛠️ Меню админа"),
+        BotCommand(command="admin", description="🛠️ Меню адміна"),
         # <-- Важно: оставить команду админа
     ]
     from aiogram.types import BotCommandScopeChat  # Импортируем для scope
@@ -256,7 +256,7 @@ async def cmd_help(message: types.Message):
 async def cmd_remains_start(message: types.Message, state: FSMContext):
     await message.delete()
     await message.answer(
-        "Пожалуйста, укажите номенклатуру (или часть названия), которую вы хотите найти:")
+        "Будь ласка, вкажіть номенклатуру (або частину назви), яку ви хочете знайти:")
     await state.set_state(BotStates.waiting_for_nomenclature)
 
 
@@ -265,10 +265,10 @@ async def process_nomenclature_query(message: types.Message, state: FSMContext):
     query = message.text.strip()
     if not query:
         await message.answer(
-            "Вы ничего не ввели. Пожалуйста, укажите номенклатуру.")
+            "Ви нічого не ввели. Будь ласка, вкажіть номенклатуру.")
         return
 
-    await message.answer(f"Ищу продукты, содержащие: <b>{query}</b>...",
+    await message.answer(f"Шукаю продукти, що містять: <b>{query}</b>...",
                          parse_mode=ParseMode.HTML)
 
     try:
@@ -276,7 +276,7 @@ async def process_nomenclature_query(message: types.Message, state: FSMContext):
 
         if not product_entries:
             await message.answer(
-                f"Не удалось найти продукты с номенклатурой, содержащей: <b>{query}</b>.",
+                f"Не вдалося знайти продукти з номенклатурою, що містить: <b>{query}</b>.",
                 parse_mode=ParseMode.HTML)
             await state.clear()
             return
@@ -290,7 +290,7 @@ async def process_nomenclature_query(message: types.Message, state: FSMContext):
         builder.adjust(1)
 
         await message.answer(
-            "Найдено несколько совпадений. Пожалуйста, выберите нужный продукт:",
+            "Знайдено декілька збігів. Будь ласка, оберіть потрібний продукт:",
             reply_markup=builder.as_markup()
         )
         await state.set_state(BotStates.waiting_for_product_selection)
@@ -299,7 +299,7 @@ async def process_nomenclature_query(message: types.Message, state: FSMContext):
     except Exception as e:
         print(f"Ошибка при поиске продуктов: {e}")
         await message.answer(
-            f"Произошла ошибка при поиске продуктов. Попробуйте еще раз. Ошибка: `{e}`",
+            f"Сталася помилка під час пошуку продуктів. Спробуйте ще раз. Помилка: `{e}`",
             parse_mode=ParseMode.HTML)
         await state.clear()
 
@@ -317,14 +317,14 @@ async def process_product_selection(callback_query: types.CallbackQuery,
     await callback_query.answer("Ищу остатки...")
     product_uuid = callback_query.data.split(':')[1]
 
-    await callback_query.message.answer("Выбрано. Загружаю остатки...",
+    await callback_query.message.answer("Обрано. Завантажую залишки...",
                                         parse_mode=ParseMode.HTML)
 
     try:
         product_entry = await get_product_by_id(product_uuid)
         if not product_entry:
             await callback_query.message.answer(
-                "Продукт не найден в справочнике.")
+                "Продукт не знайдено в довіднику.")
             return
 
         remains_for_product = await get_remains(product_entry[0]['id'])
@@ -335,7 +335,7 @@ async def process_product_selection(callback_query: types.CallbackQuery,
 
         if remains_for_product:
             response_parts.append(
-                f"📦 <b><u>*Остатки для продукта: {product_entry[0]['product']}*</u></b>\n")
+                f"📦 <b><u>*Залишки для продукту: {product_entry[0]['product']}*</u></b>\n")
 
             # Расчет общего количества (Бух. и Склад) - теперь всегда выводится
             total_buh = 0
@@ -348,9 +348,9 @@ async def process_product_selection(callback_query: types.CallbackQuery,
                     pass
 
             response_parts.append(
-                f"  📊 <b>Общее наличие (Бух.):</b> <code>{total_buh:.2f}</code>\n")
+                f"  📊 <b>Загальна наявність (Бух.):</b> <code>{total_buh:.2f}</code>\n")
             response_parts.append(
-                f"  📊 <b>Общее наличие (Склад):</b> <code>{total_skl:.2f}</code>\n")
+                f"  📊 <b>Загальна наявність (Склад):</b> <code>{total_skl:.2f}</code>\n")
 
             # Расчет и вывод количества под заявками и свободного остатка (всегда)
             total_submissions_quantity = 0
@@ -363,20 +363,20 @@ async def process_product_selection(callback_query: types.CallbackQuery,
                         pass
 
             response_parts.append(
-                f"  📝 <b>Под заявками:</b> <code>{total_submissions_quantity:.2f}</code>\n")
+                f"  📝 <b>Під заявками:</b> <code>{total_submissions_quantity:.2f}</code>\n")
 
             free_stock = total_skl - total_submissions_quantity  # Используем total_skl, который теперь всегда подсчитан
             # Если свободный остаток меньше нуля, устанавливаем его в 0
             if free_stock < 0:
                 free_stock = 0
 
-            free_stock_status = "✅ Есть свободный" if free_stock > 0 else "❌ Нет свободного"
+            free_stock_status = "✅ Є вільний" if free_stock > 0 else "❌ Немає вільного"
             response_parts.append(
-                f"  ➡️ <b>Свободный остаток:</b> <code>{free_stock:.2f}</code> ({free_stock_status})\n\n")
+                f"  ➡️ <b>Вільний залишок:</b> <code>{free_stock:.2f}</code> ({free_stock_status})\n\n")
 
             # Добавляем заголовок "Детали по партиям" только если их больше одной
             if len(remains_for_product) > 1:
-                response_parts.append("<b>Детали по партиям:</b>\n")
+                response_parts.append("<b>Деталі по партіях:</b>\n")
 
             # Вывод по партиям
             for r in remains_for_product:
@@ -400,7 +400,7 @@ async def process_product_selection(callback_query: types.CallbackQuery,
                     )
         else:
             response_parts.append(f"📦 *Продукт: {product_entry[0]['product']}*")
-            response_parts.append("  _Остатков не найдено._")
+            response_parts.append("  _Залишків не знайдено._")
 
         final_response = "".join(response_parts)
 
@@ -410,13 +410,13 @@ async def process_product_selection(callback_query: types.CallbackQuery,
         await state.update_data(current_product_uuid=product_uuid)
 
         builder.button(
-            text="👉 Показать у кого под заявками",
+            text="👉 Показати у кого під заявками",
             callback_data="show_submissions_for_last_viewed_product"
         )
 
         if len(final_response) > 4000:
             await callback_query.message.answer(
-                "Найдено слишком много результатов. Пожалуйста, уточните запрос.")
+                "Знайдено забагато результатів. Будь ласка, уточніть запит.")
         else:
             await callback_query.message.answer(
                 final_response,
@@ -427,7 +427,7 @@ async def process_product_selection(callback_query: types.CallbackQuery,
     except Exception as e:
         print(f"Ошибка при поиске остатков по выбранному продукту: {e}")
         await callback_query.message.answer(
-            f"Произошла ошибка при поиске остатков. Попробуйте еще раз. Ошибка: `{e}`",
+            f"Сталася помилка під час пошуку залишків. Спробуйте ще раз. Помилка: `{e}`",
             parse_mode=ParseMode.HTML)
     finally:
         pass
@@ -438,7 +438,7 @@ async def process_product_selection(callback_query: types.CallbackQuery,
 async def cmd_submissions_start(message: types.Message, state: FSMContext):
     await message.delete()
     await message.answer(
-        "Пожалуйста, укажите номенклатуру (или часть названия) товара, по которому нужно найти заявки:",
+        "Будь ласка, вкажіть номенклатуру (або частину назви) товару, за яким потрібно знайти заявки:",
         parse_mode=ParseMode.HTML)
     await state.set_state(BotStates.waiting_for_submissions_nomenclature)
 
@@ -449,7 +449,7 @@ async def process_submissions_nomenclature_query(message: types.Message,
     query = message.text.strip()
     if not query:
         await message.answer(
-            "Вы ничего не ввели. Пожалуйста, укажите номенклатуру.",
+            "Ви нічого не ввели. Будь ласка, вкажіть номенклатуру.",
             parse_mode=ParseMode.HTML)
         return
 
@@ -458,7 +458,7 @@ async def process_submissions_nomenclature_query(message: types.Message,
     except Exception as e:
         print(f"Не удалось удалить сообщение пользователя: {e}")
 
-    await message.answer(f"Ищу продукты, содержащие: <b>{query}</b>...",
+    await message.answer(f"Шукаю продукти, що містять: <b>{query}</b>...",
                          parse_mode=ParseMode.HTML)
 
     try:
@@ -466,7 +466,7 @@ async def process_submissions_nomenclature_query(message: types.Message,
 
         if not product_entries:
             await message.answer(
-                f"Не удалось найти продукты с номенклатурой, содержащей: <b>{query}</b>.",
+                f"Не вдалося знайти продукти з номенклатурою, що містить: <b>{query}</b>.",
                 parse_mode=ParseMode.HTML)
             await state.clear()
             return
@@ -481,7 +481,7 @@ async def process_submissions_nomenclature_query(message: types.Message,
         builder.adjust(1)
 
         await message.answer(
-            "Найдено несколько совпадений. Пожалуйста, выберите нужный продукт:",
+            "Знайдено декілька збігів. Будь ласка, оберіть потрібний продукт:",
             reply_markup=builder.as_markup(),
             parse_mode=ParseMode.HTML
         )
@@ -492,7 +492,7 @@ async def process_submissions_nomenclature_query(message: types.Message,
     except Exception as e:
         print(f"Ошибка при поиске продуктов для заявок: {e}")
         await message.answer(
-            f"Произошла ошибка при поиске продуктов. Попробуйте еще раз. Ошибка: <code>{e}</code>",
+            f"Сталася помилка під час пошуку продуктів. Спробуйте ще раз. Помилка: <code>{e}</code>",
             parse_mode=ParseMode.HTML)
         await state.clear()
 
@@ -504,14 +504,14 @@ async def process_submissions_product_selection(
     await callback_query.answer()
     product_uuid = callback_query.data.split(':')[1]
 
-    await callback_query.message.answer("Выбрано. Ищу заявки...",
+    await callback_query.message.answer("Обрано. Шукаю заявки...",
                                         parse_mode=ParseMode.HTML)
 
     try:
         product_entry = await get_product_by_id(product_uuid)
         if not product_entry:
             await callback_query.message.answer(
-                "Продукт не найден в справочнике.", parse_mode=ParseMode.HTML)
+                "Продукт не знайдено в довіднику.", parse_mode=ParseMode.HTML)
             return
 
         submissions_data = await get_submissions(product_entry[0]['id'])
@@ -519,7 +519,7 @@ async def process_submissions_product_selection(
         response_parts = []
         if submissions_data:
             response_parts.append(
-                f"📄 <b>Заявки для продукта: {product_entry[0]['product']}</b>\n")
+                f"📄 <b>Заявки для продукту: {product_entry[0]['product']}</b>\n")
 
             for s in submissions_data:
                 response_parts.append(
@@ -531,13 +531,13 @@ async def process_submissions_product_selection(
         else:
             response_parts.append(
                 f"📄 <b>Продукт: {product_entry[0]['product']}</b>\n")
-            response_parts.append("  <i>Заявок не найдено.</i>\n")
+            response_parts.append("  <i>Заявок не знайдено.</i>\n")
 
         final_response = "".join(response_parts)
 
         if len(final_response) > 4000:
             await callback_query.message.answer(
-                "Найдено слишком много результатов. Пожалуйста, уточните запрос.",
+                "Знайдено забагато результатів. Будь ласка, уточніть запит.",
                 parse_mode=ParseMode.HTML)
         else:
             try:
@@ -550,7 +550,7 @@ async def process_submissions_product_selection(
 
     except Exception as e:
         print(f"Ошибка при поиске заявок по выбранному продукту: {e}")
-        error_message = f"Произошла ошибка при поиске заявок. Попробуйте еще раз. Ошибка: <code>{e}</code>"
+        error_message = f"Сталася помилка під час пошуку заявок. Спробуйте ще раз. Помилка: <code>{e}</code>"
         try:
             await callback_query.message.edit_text(error_message,
                                                    parse_mode=ParseMode.HTML)
@@ -568,7 +568,7 @@ async def show_submissions_for_product(callback_query: types.CallbackQuery,
     Обрабатывает нажатие кнопки "Показать у кого под заявками" из сообщения с остатками.
     Получает UUID продукта из FSMContext.
     """
-    await callback_query.answer("Загружаю заявки...")
+    await callback_query.answer("Завантажую заявки...")
 
     data = await state.get_data()
     product_uuid = data.get('current_product_uuid')
@@ -579,14 +579,14 @@ async def show_submissions_for_product(callback_query: types.CallbackQuery,
             parse_mode=ParseMode.HTML)
         return
 
-    await callback_query.message.answer("Выбрано. Загружаю заявки...",
+    await callback_query.message.answer("Обрано. Завантажую заявки...",
                                         parse_mode=ParseMode.HTML)
 
     try:
         product_entry = await get_product_by_id(product_uuid)
         if not product_entry:
             await callback_query.message.answer(
-                "Продукт не найден в справочнике.", parse_mode=ParseMode.HTML)
+                "Продукт не знайдено в довіднику.", parse_mode=ParseMode.HTML)
             return
 
         submissions_data = await get_submissions(product_entry[0]['id'])
@@ -594,7 +594,7 @@ async def show_submissions_for_product(callback_query: types.CallbackQuery,
         response_parts = []
         if submissions_data:
             response_parts.append(
-                f"📄 <b>Заявки для продукта: {product_entry[0]['product']}</b>\n")
+                f"📄 <b>Заявки для продукту: {product_entry[0]['product']}</b>\n")
 
             for s in submissions_data:
                 response_parts.append(
@@ -606,13 +606,13 @@ async def show_submissions_for_product(callback_query: types.CallbackQuery,
         else:
             response_parts.append(
                 f"📄 <b>Продукт: {product_entry[0]['product']}</b>\n")
-            response_parts.append("  <i>Заявок не найдено.</i>\n")
+            response_parts.append("  <i>Заявок не знайдено.</i>\n")
 
         final_response = "".join(response_parts)
 
         if len(final_response) > 4000:
             await callback_query.message.answer(
-                "Найдено слишком много результатов. Пожалуйста, уточните запрос.",
+                "Знайдено забагато результатів. Будь ласка, уточніть запит.",
                 parse_mode=ParseMode.HTML)
         else:
             await callback_query.message.answer(final_response,
@@ -622,7 +622,7 @@ async def show_submissions_for_product(callback_query: types.CallbackQuery,
         print(
             f"Ошибка при поиске заявок по выбранному продукту из остатков: {e}")
         await callback_query.message.answer(
-            f"Произошла ошибка при поиске заявок. Попробуйте еще раз. Ошибка: <code>{e}</code>",
+            f"Сталася помилка під час пошуку заявок. Спробуйте ще раз. Помилка: <code>{e}</code>",
             parse_mode=ParseMode.HTML)
     finally:
         pass
@@ -633,7 +633,7 @@ async def show_submissions_for_product(callback_query: types.CallbackQuery,
 async def echo_message(message: types.Message):
     if message.text:
         await message.answer(
-            "Для отримання потрібної інформації, скористайтеся кнопкой ' ☰ ', она леворуч",
+            "Для отримання потрібної інформації, скористайтеся кнопкой ' ☰ ', вона ліворуч",
             parse_mode=ParseMode.HTML)
     else:
-        await message.answer("Я получил сообщение, но оно не содержит текста.")
+        await message.answer("Ви отримали сповіщення, але воно не містить тексту.")
