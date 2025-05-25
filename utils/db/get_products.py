@@ -1,7 +1,7 @@
 from bot_tables.tables import ProductGuide
 
 async def get_products(query: str):
-    products = await ProductGuide.select().where(ProductGuide.product.ilike(f"%{query}%"))
+    products = await ProductGuide.select().where(ProductGuide.product.ilike(f"%{query}%")).order_by(ProductGuide.product)
     return products
 
 async def get_product_by_id(id_product: str):
