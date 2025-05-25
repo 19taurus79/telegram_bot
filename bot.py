@@ -36,7 +36,7 @@ async def set_new_commands(bot: Bot):
     new_commands = [
         BotCommand(command="remains", description="📦 Залишки"),
         BotCommand(command="orders", description="📄 Заявки на товар"),
-        BotCommand(command="admin", description="🛠️ Меню админа"),
+        BotCommand(command="admin", description="🛠️ Меню адміна"),
         # BotCommand(command="help", description="❓ Получить помощь"),
         # BotCommand(command="settings", description="⚙️ Изменить настройки"),
         # BotCommand(command="about", description="ℹ️ О боте"),
