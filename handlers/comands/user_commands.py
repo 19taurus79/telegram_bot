@@ -3,16 +3,35 @@ from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from utils.db.get_products import get_products, get_product_by_id
 from utils.db.get_remains import get_remains
 from utils.db.get_submissions import get_submissions
 
+
+
+
+
+# Для логирования в хендлерах
+import logging
+# Если будете брать ADMIN_IDS из .env
+import os
+
+# Импортируем асинхронные функции для работы с базой данных пользователей
+from middlewares.auth_middleware import set_user_allowed_status, get_user_info, get_all_users
 # Создаем роутер для хендлеров
 router = Router()
+logger = logging.getLogger(__name__)
 
+# Вариант 2: Чтение из .env (более гибко)
+# Если вы используете этот вариант, добавьте ADMIN_TELEGRAM_IDS=123,456 в .env
+admin_ids_str = os.getenv("ADMIN_TELEGRAM_IDS", "")
+ADMIN_IDS = [int(id_str.strip()) for id_str in admin_ids_str.split(',') if id_str.strip()]
+
+def is_admin(user_id: int) -> bool:
+    return user_id in ADMIN_IDS
 
 class BotStates(StatesGroup):
     waiting_for_nomenclature = State()
@@ -39,6 +58,178 @@ async def cmd_start(message: types.Message):
         reply_markup=keyboard
     )
 
+
+# --- Хендлер для команды /admin ---
+@router.message(Command("admin"))
+async def cmd_admin_menu(message: types.Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("У вас нет прав для доступа к админ-меню.")
+        logger.warning(
+            f"Неавторизованная попытка доступа к /admin от {message.from_user.id}")
+        return
+
+    logger.info(f"Администратор {message.from_user.id} запросил админ-меню.")
+
+    # Создаем админские команды для меню Telegram
+    admin_commands = [
+        BotCommand(command="start", description="🏠 Главное меню"),
+        BotCommand(command="list_users", description="👤 Список пользователей"),
+        BotCommand(command="allow_user", description="✅ Разрешить доступ"),
+        BotCommand(command="disallow_user", description="❌ Запретить доступ"),
+        BotCommand(command="set_default_commands",
+                   description="🔄 Вернуть обычные команды"),  # Для возврата
+        # BotCommand(command="some_other_admin_command", description="Другая админ-команда"),
+    ]
+
+    # Устанавливаем команды для данного пользователя
+    # scope=BotCommandScopeChat(chat_id=message.chat.id) означает, что команды видны только в этом чате для этого пользователя
+    from aiogram.types import BotCommandScopeChat  # Импортируем для scope
+    await message.bot.set_my_commands(
+        admin_commands,
+        scope=BotCommandScopeChat(chat_id=message.chat.id)
+    )
+
+    await message.answer(
+        "Добро пожаловать в админ-меню! Ваши команды обновлены.\n"
+        "Используйте /list_users, /allow_user ID, /disallow_user ID.\n"
+        "Чтобы вернуться к обычным командам, нажмите /set_default_commands."
+    )
+
+
+# --- Хендлер для возврата к обычным командам ---
+@router.message(Command("set_default_commands"))
+async def cmd_set_default_commands(message: types.Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("У вас нет прав для выполнения этой команды.")
+        return
+
+    # Загружаем обычные команды (как в set_new_commands в main.py)
+    default_commands = [
+        BotCommand(command="remains", description="📦 Залишки"),
+        BotCommand(command="orders", description="📄 Заявки на товар"),
+        # BotCommand(command="help", description="❓ Получить помощь"),
+        # BotCommand(command="settings", description="⚙️ Изменить настройки"),
+        # BotCommand(command="about", description="ℹ️ О боте"),
+        BotCommand(command="admin", description="🛠️ Меню админа"),
+        # <-- Важно: оставить команду админа
+    ]
+    from aiogram.types import BotCommandScopeChat  # Импортируем для scope
+    await message.bot.set_my_commands(
+        default_commands,
+        scope=BotCommandScopeChat(chat_id=message.chat.id)
+    )
+    await message.answer("Команды бота сброшены на обычные.")
+# --- НОВЫЕ АДМИНИСТРАТИВНЫЕ КОМАНДЫ ---
+
+@router.message(Command("allow_user"))
+async def cmd_allow_user(message: types.Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        await message.answer("У вас нет прав для выполнения этой команды.")
+        logger.warning(f"Неавторизованная попытка /allow_user от {message.from_user.id}")
+        return
+
+    args = message.text.split()
+    if len(args) != 2:
+        await message.answer("Использование: /allow_user Telegram_ID")
+        return
+
+    try:
+        user_id_to_allow = int(args[1])
+    except ValueError:
+        await message.answer("Неверный формат Telegram ID. Используйте число.")
+        return
+
+    logger.info(f"Администратор {message.from_user.id} пытается разрешить доступ пользователю {user_id_to_allow}")
+    if await set_user_allowed_status(user_id_to_allow, True):
+        user_info = await get_user_info(user_id_to_allow)
+        if user_info:
+            name_display = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
+            if user_info.get('username'):
+                name_display += f" (@{user_info.get('username')})"
+
+            final_display = name_display if name_display else f"Пользователю с ID: {user_id_to_allow}"
+            await message.answer(f"{final_display} предоставлен доступ.")
+            logger.info(f"Доступ разрешен пользователю {user_id_to_allow}")
+        else:
+            await message.answer(f"Пользователю с ID: {user_id_to_allow} предоставлен доступ (информация не найдена).")
+            logger.info(f"Доступ разрешен пользователю {user_id_to_allow}, но инфо не найдено.")
+    else:
+        await message.answer(f"Не удалось предоставить доступ пользователю с ID: {user_id_to_allow}. Возможно, пользователь не найден в БД или ошибка.")
+        logger.error(f"Ошибка при разрешении доступа пользователю {user_id_to_allow} администратором {message.from_user.id}")
+
+@router.message(Command("disallow_user"))
+async def cmd_disallow_user(message: types.Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        await message.answer("У вас нет прав для выполнения этой команды.")
+        logger.warning(f"Неавторизованная попытка /disallow_user от {message.from_user.id}")
+        return
+
+    args = message.text.split()
+    if len(args) != 2:
+        await message.answer("Использование: /disallow_user Telegram_ID")
+        return
+
+    try:
+        user_id_to_disallow = int(args[1])
+    except ValueError:
+        await message.answer("Неверный формат Telegram ID. Используйте число.")
+        return
+
+    logger.info(f"Администратор {message.from_user.id} пытается запретить доступ пользователю {user_id_to_disallow}")
+    if await set_user_allowed_status(user_id_to_disallow, False):
+        await message.answer(f"Доступ пользователю с ID: {user_id_to_disallow} запрещен.")
+        logger.info(f"Доступ запрещен пользователю {user_id_to_disallow}")
+    else:
+        await message.answer(f"Не удалось запретить доступ пользователю с ID: {user_id_to_disallow}. Возможно, пользователь не найден в БД или ошибка.")
+        logger.error(f"Ошибка при запрете доступа пользователю {user_id_to_disallow} администратором {message.from_user.id}")
+
+@router.message(Command("list_users"))
+async def cmd_list_users(message: types.Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("У вас нет прав для выполнения этой команды.")
+        logger.warning(f"Неавторизованная попытка /list_users от {message.from_user.id}")
+        return
+
+    logger.info(f"Администратор {message.from_user.id} запросил список пользователей.")
+    users_info = await get_all_users()
+
+    if not users_info:
+        await message.answer("В базе данных нет зарегистрированных пользователей.")
+        return
+
+    response_parts = ["<b>Список пользователей:</b>\n\n"]
+    for user_data in users_info:
+        telegram_id = user_data.get('telegram_id')
+        username = user_data.get('username')
+        first_name = user_data.get('first_name', '')
+        last_name = user_data.get('last_name', '')
+        is_allowed = user_data.get('is_allowed')
+        reg_date = user_data.get('registration_date')
+        last_act_date = user_data.get('last_activity_date')
+
+        status = "✅ Разрешен" if is_allowed else "❌ Запрещен"
+
+        user_display = f"ID: <code>{telegram_id}</code>\n"
+        if username:
+            user_display += f"Юзернейм: @{username}\n"
+
+        full_name = f"{first_name} {last_name}".strip()
+        if full_name:
+            user_display += f"Имя: {full_name}\n"
+
+        user_display += f"Статус: {status}\n"
+        user_display += f"Рег.: {reg_date.strftime('%Y-%m-%d %H:%M') if reg_date else 'N/A'}\n"
+        user_display += f"Акт.: {last_act_date.strftime('%Y-%m-%d %H:%M') if last_act_date else 'N/A'}\n"
+        response_parts.append(user_display + "\n")
+
+    final_response = "".join(response_parts)
+
+    MAX_MESSAGE_LENGTH = 4096
+    if len(final_response) > MAX_MESSAGE_LENGTH:
+        for i in range(0, len(final_response), MAX_MESSAGE_LENGTH):
+            await message.answer(final_response[i:i+MAX_MESSAGE_LENGTH], parse_mode=ParseMode.HTML)
+    else:
+        await message.answer(final_response, parse_mode=ParseMode.HTML)
 
 @router.message(Command("menu"))
 async def cmd_menu(message: types.Message, state: FSMContext):
