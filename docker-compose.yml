@@ -31,9 +31,9 @@ services:
     container_name: eridon_bot
     build:
       context: . # Путь к папке, где находится Dockerfile вашего бота
-      dockerfile: Dockerfile
+      dockerfile: bot/Dockerfile
     env_file:
-      - ./.env # Переменные окружения для вашего бота
+      - bot/.env # Переменные окружения для вашего бота
     volumes:
       - logging_data:/home/docker_user/app/log # Использует том logging_data
     depends_on:

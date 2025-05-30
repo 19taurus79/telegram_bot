@@ -6,9 +6,9 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from utils.db.get_products import get_products, get_product_by_id
-from utils.db.get_remains import get_remains
-from utils.db.get_submissions import get_submissions
+from bot.utils.db.get_products import get_products, get_product_by_id
+from bot.utils.db.get_remains import get_remains
+from bot.utils.db.get_submissions import get_submissions
 
 
 
@@ -20,7 +20,7 @@ import logging
 import os
 
 # Импортируем асинхронные функции для работы с базой данных пользователей
-from middlewares.auth_middleware import set_user_allowed_status, get_user_info, get_all_users
+from bot.middlewares.auth_middleware import set_user_allowed_status, get_user_info, get_all_users
 # Создаем роутер для хендлеров
 router = Router()
 logger = logging.getLogger(__name__)
