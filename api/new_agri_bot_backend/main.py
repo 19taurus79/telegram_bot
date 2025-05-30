@@ -10,9 +10,9 @@ from datetime import datetime, timedelta
 import uuid
 from contextlib import asynccontextmanager
 # Импорты Piccolo и конфига
-from database import DB
-from tables import ProductGuide, Remains, AvailableStock, Submissions, Payment, MovedData
-from config import TELEGRAM_BOT_TOKEN, MANAGERS_ID, valid_line_of_business, valid_warehouse
+# from database import DB
+from .tables import ProductGuide, Remains, AvailableStock, Submissions, Payment, MovedData
+from .config import TELEGRAM_BOT_TOKEN, MANAGERS_ID, valid_line_of_business, valid_warehouse
 import math
 from datetime import datetime, date
 
