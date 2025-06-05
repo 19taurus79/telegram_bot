@@ -1,6 +1,7 @@
 # data_loader_api/app/main.py
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, HTTPException, status, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, status, BackgroundTasks, Depends
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
 import pandas as pd
 import io
@@ -11,10 +12,75 @@ import uuid
 from contextlib import asynccontextmanager
 # Импорты Piccolo и конфига
 # from database import DB
-from .tables import ProductGuide, Remains, AvailableStock, Submissions, Payment, MovedData
-from .config import TELEGRAM_BOT_TOKEN, MANAGERS_ID, valid_line_of_business, valid_warehouse
+from tables import ProductGuide, Remains, AvailableStock, Submissions, Payment, MovedData
+from config import TELEGRAM_BOT_TOKEN, MANAGERS_ID, valid_line_of_business, valid_warehouse
 import math
 from datetime import datetime, date
+from pydantic import BaseModel
+import jwt
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+# Алгоритм шифрования
+ALGORITHM = "HS256"
+
+# Время жизни токена
+ACCESS_TOKEN_EXPIRE_MINUTES = os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30)
+
+# Словарь для хранения пользователей
+users = {
+    os.getenv("POSTGRES_USER"): {
+        "username": os.getenv("POSTGRES_USER"),
+        "password": os.getenv("POSTGRES_PASSWORD"),
+    }
+}
+
+# Словарь для хранения токенов
+tokens = {}
+
+# Определите модель для токена
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+# Определите схему аутентификации
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# Функция для создания токена
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+# Функция для проверки токена
+def verify_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+# Функция для аутентификации пользователя
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    payload = verify_token(token)
+    username = payload.get("sub")
+    if username is None:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+    user = users.get(username)
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
 
 # Инициализация FastAPI приложения
 # Определяем контекстный менеджер для жизненного цикла приложения
@@ -49,7 +115,24 @@ bot = Bot(TELEGRAM_BOT_TOKEN)
 # пока Pandas выполняет тяжелые вычисления.
 executor = ThreadPoolExecutor(max_workers=4) # Можно настроить количество рабочих потоков
 
+# Создайте маршрут для получения токена
+@app.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = users.get(form_data.username)
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    if not user["password"] == form_data.password:
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    access_token_expires = timedelta(minutes=int(ACCESS_TOKEN_EXPIRE_MINUTES))
+    access_token = create_access_token(
+        data={"sub": user["username"]}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
+# Используйте аутентификацию для защищённых маршрутов
+@app.get("/protected")
+async def protected_route(user: dict = Depends(get_current_user)):
+    return {"message": f"Hello, {user['username']}"}
 
 # Вспомогательная функция для чтения содержимого Excel в DataFrame
 def read_excel_content(content: bytes, sheet_name=0) -> pd.DataFrame:
