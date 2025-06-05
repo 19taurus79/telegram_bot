@@ -130,9 +130,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": access_token, "token_type": "bearer"}
 
 # Используйте аутентификацию для защищённых маршрутов
-@app.get("/protected")
-async def protected_route(user: dict = Depends(get_current_user)):
-    return {"message": f"Hello, {user['username']}"}
+# @app.get("/protected")
+# async def protected_route(user: dict = Depends(get_current_user)):
+#     return {"message": f"Hello, {user['username']}"}
 
 # Вспомогательная функция для чтения содержимого Excel в DataFrame
 def read_excel_content(content: bytes, sheet_name=0) -> pd.DataFrame:
@@ -726,6 +726,7 @@ async def upload_all_data(
     remains_file: UploadFile = File(..., description="Excel file for Remains (Остатки.xlsx)"),
     payment_file: UploadFile = File(..., description="Excel file for Payment (оплата.xlsx)"),
     moved_data_file: UploadFile = File(..., description="Excel file for Moved Data (Заказано_Перемещено.xlsx)"),
+    user: dict = Depends(get_current_user), # Проверка аутентификации пользователя
 ):
     """
     Принимает несколько Excel-файлов, обрабатывает их с помощью Pandas,
@@ -772,14 +773,14 @@ async def upload_all_data(
     )
 
 # Пример эндпоинта для получения данных из ProductGuide
-@app.get("/product_guide/{product_name}", summary="Get ProductGuide details by product name")
-async def get_product_guide(product_name: str):
-    product_name_cleaned = product_name.strip()
-    # Ищем продукт по имени
-    product = await ProductGuide.objects().where(ProductGuide.product == product_name_cleaned).first()
-    if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found in guide")
-    return product.to_dict()
+# @app.get("/product_guide/{product_name}", summary="Get ProductGuide details by product name")
+# async def get_product_guide(product_name: str):
+#     product_name_cleaned = product_name.strip()
+#     # Ищем продукт по имени
+#     product = await ProductGuide.objects().where(ProductGuide.product == product_name_cleaned).first()
+#     if not product:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found in guide")
+#     return product.to_dict()
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
