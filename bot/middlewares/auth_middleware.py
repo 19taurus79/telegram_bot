@@ -4,7 +4,8 @@ from typing import Callable, Dict, Any, List
 import logging
 import os
 import asyncpg
-
+from dotenv import load_dotenv
+load_dotenv()
 # Путь к вашей базе данных пользователей Telegram (PostgreSQL connection string)
 USERS_DB_URL = os.getenv("TELEGRAM_USERS_DB_URL")
 

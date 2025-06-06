@@ -2,20 +2,20 @@ version: '3.8'
 
 services:
 
-#  db:
-#    image: postgres:15.6
-#    environment:
-#      POSTGRES_DB: ${POSTGRES_DB}
-#      POSTGRES_USER: ${POSTGRES_USER}
-#      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-#    volumes:
-#      - pgdata:/var/lib/postgresql/data
-#    # Порт 5432 для БД можно оставить, если вам нужен прямой доступ к БД с хоста
-#    # или если другие локальные инструменты его используют.
-#    # Если БД нужна только внутри Docker-сети, можно убрать.
-#    ports:
-#      - "5432:5432"
-#    restart: unless-stopped
+  db:
+    image: postgres:15.6
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Порт 5432 для БД можно оставить, если вам нужен прямой доступ к БД с хоста
+    # или если другие локальные инструменты его используют.
+    # Если БД нужна только внутри Docker-сети, можно убрать.
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
 
   nginx:
     image: nginx:stable-alpine
@@ -43,7 +43,7 @@ services:
     volumes:
       - logging_data:/home/docker_user/app/log
     depends_on:
-#      - db
+      - db
       - agri_api # Бот зависит от API
       # - nginx # Если бот обращается к API через публичный домен (что редко), добавьте эту зависимость
     restart: unless-stopped
@@ -65,8 +65,8 @@ services:
       DB_NAME: ${POSTGRES_DB}
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-#    depends_on:
-#      - db
+    depends_on:
+      - db
     restart: unless-stopped
 
   pgadmin:
@@ -79,11 +79,11 @@ services:
     # УДАЛИТЕ ИЛИ ЗАКОММЕНТИРУЙТЕ ЭТУ СТРОКУ, если доступ только через Nginx
     # ports:
     #   - "5050:80" # PgAdmin внутри контейнера слушает порт 80
-#    depends_on:
-#      - db
+    depends_on:
+      - db
     restart: unless-stopped
 
 volumes:
-#  pgdata:
+  pgdata:
   logging_data:
   pgadmin_data:

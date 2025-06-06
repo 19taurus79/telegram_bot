@@ -21,7 +21,7 @@ import jwt
 import os
 from dotenv import load_dotenv
 load_dotenv()
-
+os.environ['PICCOLO_CONF'] = 'piccolo_conf'
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # Алгоритм шифрования
@@ -783,4 +783,4 @@ async def upload_all_data(
 #     return product.to_dict()
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("new_agri_bot_backend.main:app", host="127.0.0.1", port=8000, reload=True)
