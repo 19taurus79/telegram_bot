@@ -10,9 +10,8 @@ from utils.db.get_products import get_products, get_product_by_id
 from utils.db.get_remains import get_remains
 from utils.db.get_submissions import get_submissions
 
-
-
-
+import aiohttp
+import re
 
 # Для логирования в хендлерах
 import logging
@@ -39,10 +38,41 @@ class BotStates(StatesGroup):
     waiting_for_submissions_nomenclature = State()
     waiting_for_submissions_product_selection = State()
 
+class RegistrationStates(StatesGroup):
+    waiting_for_fio = State()
+
+# URL бэкенда для проверки логина (в docker-compose обычно eridon_api:8000)
+API_BASE_URL = os.getenv("API_BASE_URL", "http://eridon_api:8000")
 
 # Основное меню и команды
 @router.message(CommandStart())
 async def cmd_start(message: types.Message):
+    telegram_id = message.from_user.id
+    
+    # Обработка глубокой ссылки /start weblogin_1234
+    text = message.text or ""
+    parts = text.split(" ", 1)
+    if len(parts) == 2 and parts[1].startswith("weblogin_"):
+        token = parts[1][len("weblogin_"):]
+        await verify_login_token(message, token, telegram_id)
+        return
+
+    # Получаем информацию о пользователе из нашей БД (заполняется middleware)
+    # На этом этапе auth_middleware уже сработал и создал запись
+    user_info = await get_user_info(telegram_id)
+    is_allowed = user_info.get("is_allowed") if user_info else False
+
+    if not is_allowed:
+        # Предлагаем запросить доступ
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📨 Надіслати запит", callback_data="request_access")]
+        ])
+        await message.answer(
+            "🤖 Вас немає в системі або ви очікуєте підтвердження. Будь ласка, зверніться до розробника або надішліть новий запит.",
+            reply_markup=keyboard
+        )
+        return
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Показать мои данные",
                               callback_data="show_my_data")],
@@ -54,9 +84,139 @@ async def cmd_start(message: types.Message):
 
     await message.answer(
         f"Привет, {message.from_user.full_name}! 👋\n\n"
-        "Я могу многое! Выбери одну из опций ниже:",
+        "Вітаю! Я бот авторизації Eridon.\n"
+        "Якщо ви намагаєтесь увійти в систему, відправте мені 4-значний код з екрану.\n\n"
+        "Або оберіть одну з опцій нижче:",
         reply_markup=keyboard
     )
+
+
+# --- Хендлеры регистрации ---
+@router.callback_query(lambda c: c.data == "request_access")
+async def process_request_access(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.answer(
+        "Напишіть, будь ласка, хто ви (ПІБ, посада), щоб адміністратор міг вас ідентифікувати."
+    )
+    await state.set_state(RegistrationStates.waiting_for_fio)
+    await callback.answer()
+
+@router.message(RegistrationStates.waiting_for_fio)
+async def process_fio_input(message: types.Message, state: FSMContext):
+    fio = message.text
+    telegram_id = message.from_user.id
+    username = message.from_user.username or "без username"
+    
+    if not ADMIN_IDS:
+        await message.answer("❌ Помилка: ADMIN_TELEGRAM_IDS не налаштований.")
+        await state.clear()
+        return
+
+    # Отправляем запрос админам
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="👑 Адмін", callback_data=f"approve_admin_{telegram_id}"),
+            InlineKeyboardButton(text="👤 Користувач", callback_data=f"approve_user_{telegram_id}"),
+        ],
+        [
+            InlineKeyboardButton(text="👁 Гість", callback_data=f"approve_guest_{telegram_id}"),
+            InlineKeyboardButton(text="❌ Відмовити", callback_data=f"reject_{telegram_id}")
+        ]
+    ])
+    try:
+        # Отправляем всем админам
+        for admin_id in ADMIN_IDS:
+            await message.bot.send_message(
+                chat_id=admin_id,
+                text=f"Запит на доступ від @{username} (ID: {telegram_id}).\nПовідомлення: {fio}",
+                reply_markup=keyboard
+            )
+        await message.answer("Ваш запит надіслано. Очікуйте рішення адміністратора.")
+    except Exception as e:
+        logger.error(f"Не вдалось надіслати повідомлення адміну: {e}")
+        await message.answer("❌ Помилка при надсиланні запиту адміністратору.")
+        
+    await state.clear()
+
+@router.callback_query(lambda c: c.data and (c.data.startswith("approve_admin_") or c.data.startswith("approve_user_") or c.data.startswith("approve_guest_")))
+async def approve_user_callback(callback: types.CallbackQuery):
+    parts = callback.data.split("_")
+    role = parts[1]  # admin / user / guest
+    user_id = int(parts[2])
+    
+    # Обновляем роли в БД
+    is_admin_flag = (role == "admin")
+    is_guest_flag = (role == "guest")
+    
+    import asyncpg
+    from middlewares.auth_middleware import USERS_DB_URL
+    conn = await asyncpg.connect(USERS_DB_URL)
+    await conn.execute("UPDATE users SET is_allowed = TRUE, is_admin = $1, is_guest = $2 WHERE telegram_id = $3;", is_admin_flag, is_guest_flag, user_id)
+    await conn.close()
+    
+    role_labels = {"admin": "👑 Адмін", "user": "👤 Користувач", "guest": "👁 Гість"}
+    role_label = role_labels.get(role, role)
+    
+    await callback.message.edit_text(
+        f"{callback.message.text}\n\n✅ Доступ надано. Роль: {role_label}"
+    )
+    
+    try:
+        await callback.bot.send_message(
+            chat_id=user_id,
+            text=f"🎉 Вам надано доступ ({role_label})! Тепер ви можете відкрити додаток /start"
+        )
+    except Exception as e:
+        logger.error(f"Не вдалось повідомити користувача {user_id}: {e}")
+
+@router.callback_query(lambda c: c.data and c.data.startswith("reject_"))
+async def reject_user_callback(callback: types.CallbackQuery):
+    user_id = int(callback.data.split("_")[1])
+    await callback.message.edit_text(
+        f"{callback.message.text}\n\n❌ У доступі відмовлено."
+    )
+    try:
+        await callback.bot.send_message(
+            chat_id=user_id,
+            text="❌ У доступі відмовлено."
+        )
+    except Exception as e:
+        logger.error(f"Не вдалось повідомити користувача {user_id}: {e}")
+
+
+# --- Взаимодействие с API для логина ---
+async def verify_login_token(message: types.Message, token: str, telegram_id: int):
+    """Связывается с FastAPI для проверки 4-значного токена"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"{API_BASE_URL}/auth/confirm-login-token"
+            payload = {"token": token, "telegram_id": telegram_id}
+            async with session.post(url, json=payload, timeout=5) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data.get("success"):
+                        await message.answer("✅ Вхід підтверджено! Поверніться в браузер — сторінка завантажиться автоматично.")
+                        return
+                
+    except Exception as e:
+        logger.error(f"Ошибка связи с API: {e}")
+        
+    await message.answer("❌ Код не знайдено, вже застарів або сталася помилка сервера. Спробуйте ще раз або зверніться до розробника.")
+
+
+@router.message(lambda m: m.text and re.match(r"^\d{4}$", m.text))
+async def handle_login_code(message: types.Message):
+    """Handle 4-digit login code."""
+    token = message.text
+    telegram_id = message.from_user.id
+    
+    # Проверим разрешен ли пользователь
+    user_info = await get_user_info(telegram_id)
+    is_allowed = user_info.get("is_allowed") if user_info else False
+    if not is_allowed:
+        await message.answer("❌ У вас немає дозволу на вхід в систему. Спочатку отримайте доступ через /start.")
+        return
+        
+    await verify_login_token(message, token, telegram_id)
 
 
 # --- Хендлер для команды /admin ---
