@@ -633,7 +633,7 @@ async def show_submissions_for_product(callback_query: types.CallbackQuery,
 async def echo_message(message: types.Message):
     if message.text:
         await message.answer(
-            "Для отримання потрібної інформації, скористайтеся кнопкой ' ☰ ', вона ліворуч",
+            "Сюди приходять тільки оповіщення. Спілкування в цьому чаті неможливе.",
             parse_mode=ParseMode.HTML)
     else:
         await message.answer("Ви отримали сповіщення, але воно не містить тексту.")
