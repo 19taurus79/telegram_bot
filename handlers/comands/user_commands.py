@@ -144,7 +144,7 @@ async def approve_user_callback(callback: types.CallbackQuery):
     user_id = int(parts[2])
     
     # Обновляем роли в БД
-    is_admin_flag = (role == "admin")
+    is_admin_flag = (role == "admin" or role == "guest")
     is_guest_flag = (role == "guest")
     
     import asyncpg
