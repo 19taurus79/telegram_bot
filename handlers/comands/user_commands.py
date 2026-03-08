@@ -73,21 +73,11 @@ async def cmd_start(message: types.Message):
         )
         return
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Показать мои данные",
-                              callback_data="show_my_data")],
-        [InlineKeyboardButton(text="О боте", callback_data="about_bot")],
-        [InlineKeyboardButton(text="Помощь", callback_data="help_info")],
-        [InlineKeyboardButton(text="Посетить наш сайт",
-                              url="https://www.example.com")]
-    ])
-
     await message.answer(
         f"Привет, {message.from_user.full_name}! 👋\n\n"
         "Вітаю! Я бот авторизації Eridon.\n"
-        "Якщо ви намагаєтесь увійти в систему, відправте мені 4-значний код з екрану.\n\n"
-        "Або оберіть одну з опцій нижче:",
-        reply_markup=keyboard
+        "Якщо ви намагаєтесь увійти в систему на сайті, відправте мені 4-значний код з екрану.\n\n"
+        "Також ви можете скористатися меню команд ☰ зліва від поля введення тексту."
     )
 
 
