@@ -234,12 +234,22 @@ class AuthUserMiddleware(BaseMiddleware):
         # Проверяем не является ли сообщение процессом регистрации
         is_registration = False
         text = getattr(event, 'text', '') or ''
+        
+        # Получаем текущее состояние из data
+        state = data.get("state")
+        current_state = None
+        if state:
+            current_state = await state.get_state()
+            
         # Разрешаем команды старт, ввод ФИО, запросы доступа (кнопки)
         if hasattr(event, "data") and event.data:
             if event.data in ["request_access"] or event.data.startswith("approve_") or event.data.startswith("reject_"):
                 is_registration = True
         elif text.startswith("/start") or text.isdigit():
             # Это может быть 4-значный код или команда /start
+            is_registration = True
+        elif current_state == "RegistrationStates:waiting_for_fio":
+            # Разрешаем пользователю ввести ФИО
             is_registration = True
         
         # Получаем данные пользователя для проверки (чтобы не перезаписывать is_allowed на False для существующих пользователей не-registration логикой выше)
