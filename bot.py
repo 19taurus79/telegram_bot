@@ -6,6 +6,10 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
 from dotenv import load_dotenv
 
+# Загружаем переменные окружения из .env файла ПЕРЕД импортом модулей,
+# которые используют os.getenv на уровне модуля (например, middlewares и handlers)
+load_dotenv()
+
 # Импортируем роутеры
 from handlers.comands import user_commands
 from handlers.text_message import text_messages
@@ -14,9 +18,6 @@ from handlers.callbacks import callback_handlers
 # Импортируем наши мидлвари и функции для работы с БД пользователей
 from middlewares.auth_middleware import AuthUserMiddleware, create_users_table
 from middlewares.logging_middleware import LoggingMiddleware # Импортируем мидлварь логирования
-
-# Загружаем переменные окружения из .env файла
-load_dotenv()
 
 # Настройка базового логирования
 logging.basicConfig(
