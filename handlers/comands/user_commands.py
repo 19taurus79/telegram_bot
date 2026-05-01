@@ -76,7 +76,7 @@ async def cmd_start(message: types.Message):
     await message.answer(
         f"Привет, {message.from_user.full_name}! 👋\n\n"
         "Вітаю! Я бот авторизації Eridon.\n"
-        "Якщо ви намагаєтесь увійти в систему на сайті, відправте мені 4-значний код з екрану.\n\n"
+        "Якщо ви намагаєтесь увійти в систему на сайті, відправте мені 6-значний код з екрану.\n\n"
         "Також ви можете відкрити додаток, натиснувши кнопку зліва знизу."
     )
 
@@ -175,7 +175,7 @@ async def reject_user_callback(callback: types.CallbackQuery):
 
 # --- Взаимодействие с API для логина ---
 async def verify_login_token(message: types.Message, token: str, telegram_id: int):
-    """Связывается с FastAPI для проверки 4-значного токена"""
+    """Связывается с FastAPI для проверки 6-значного токена"""
     try:
         async with aiohttp.ClientSession() as session:
             url = f"{API_BASE_URL}/auth/confirm-login-token"
@@ -193,9 +193,9 @@ async def verify_login_token(message: types.Message, token: str, telegram_id: in
     await message.answer("❌ Код не знайдено, вже застарів або сталася помилка сервера. Спробуйте ще раз або зверніться до розробника.")
 
 
-@router.message(lambda m: m.text and re.match(r"^\d{4}$", m.text))
+@router.message(lambda m: m.text and re.match(r"^\d{6}$", m.text))
 async def handle_login_code(message: types.Message):
-    """Handle 4-digit login code."""
+    """Handle 6-digit login code."""
     token = message.text
     telegram_id = message.from_user.id
     
