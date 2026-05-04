@@ -229,6 +229,11 @@ class AuthUserMiddleware(BaseMiddleware):
             data: Dict[str, Any]
     ) -> Any:
         user = event.from_user
+        
+        # Пропускаем сообщения от ботов (включая самого себя, например, при закреплении сообщений)
+        if not user or user.is_bot:
+            return await handler(event, data)
+
         user_id = user.id
 
         # Проверяем не является ли сообщение процессом регистрации
