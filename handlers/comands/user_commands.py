@@ -785,5 +785,5 @@ async def echo_message(message: types.Message):
         await message.answer(
             "Сюди приходять тільки оповіщення. Спілкування в цьому чаті неможливе.",
             parse_mode=ParseMode.HTML)
-    else:
-        await message.answer("Ви отримали сповіщення, але воно не містить тексту.")
+    # Игнорируем всё остальное (сервисные сообщения, медиа без текста и т.д.)
+    return

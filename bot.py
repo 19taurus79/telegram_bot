@@ -12,7 +12,6 @@ load_dotenv()
 
 # Импортируем роутеры
 from handlers.comands import user_commands
-from handlers.text_message import text_messages
 from handlers.callbacks import callback_handlers
 
 # Импортируем наши мидлвари и функции для работы с БД пользователей
@@ -72,7 +71,6 @@ async def main():
     # Подключаем роутеры
     dp.include_router(user_commands.router)
     dp.include_router(callback_handlers.router)
-    dp.include_router(text_messages.router)
 
     # Вызываем функцию для установки команд при запуске бота
     await set_new_commands(bot)
