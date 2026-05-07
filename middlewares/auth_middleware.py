@@ -248,8 +248,9 @@ class AuthUserMiddleware(BaseMiddleware):
             
         # Разрешаем команды старт, ввод ФИО, запросы доступа (кнопки)
         if hasattr(event, "data") and event.data:
-            if event.data in ["request_access"] or event.data.startswith("approve_") or event.data.startswith("reject_"):
+            if event.data in ["request_access", "delete_msg"] or event.data.startswith("approve_") or event.data.startswith("reject_"):
                 is_registration = True
+
         elif text.startswith("/start") or text.isdigit():
             # Это может быть 4-значный код или команда /start
             is_registration = True

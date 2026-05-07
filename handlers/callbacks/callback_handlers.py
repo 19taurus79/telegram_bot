@@ -33,7 +33,17 @@ async def process_help_info_callback(callback_query: CallbackQuery):
     )
     await callback_query.answer("Помощь.")
 
+@router.callback_query(lambda c: c.data == "delete_msg")
+async def process_delete_msg_callback(callback_query: CallbackQuery):
+    """Удаляет сообщение при нажатии на кнопку 'Удалить'"""
+    try:
+        await callback_query.message.delete()
+    except Exception:
+        await callback_query.answer("Не удалось удалить сообщение (возможно, оно слишком старое).")
+    else:
+        await callback_query.answer()
+
 # Общий хендлер для всех остальных callback-запросов (если нужно)
 @router.callback_query()
 async def process_any_callback(callback_query: CallbackQuery):
-    await callback_query.answer(f"Ты нажал на кнопку с данными: {callback_query.data}")
+    await callback_query.answer(f"Ты нажал на кнопку с данными: {callback_query.data}")
