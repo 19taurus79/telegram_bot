@@ -11,12 +11,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Импортируем роутеры
-from handlers.comands import user_commands
-from handlers.callbacks import callback_handlers
+from bot.handlers.comands import user_commands
+from bot.handlers.callbacks import callback_handlers
 
 # Импортируем наши мидлвари и функции для работы с БД пользователей
-from middlewares.auth_middleware import AuthUserMiddleware, create_users_table
-from middlewares.logging_middleware import LoggingMiddleware # Импортируем мидлварь логирования
+from bot.middlewares.auth_middleware import AuthUserMiddleware, create_users_table
+from bot.middlewares.logging_middleware import LoggingMiddleware # Импортируем мидлварь логирования
 
 # Настройка базового логирования
 logging.basicConfig(
