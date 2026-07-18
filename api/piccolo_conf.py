@@ -13,4 +13,4 @@ DB = PostgresEngine(
         "port": os.getenv("POSTGRES_PORT"),
     }
 )
-APP_REGISTRY = AppRegistry(apps=["new_agri_bot_backend.piccolo_app"])
+APP_REGISTRY = AppRegistry(apps=["piccolo_api.session_auth.piccolo_app","new_agri_bot_backend.piccolo_app"])

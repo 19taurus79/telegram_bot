@@ -127,6 +127,7 @@ class Users(Table):
     first_name=Varchar()
     last_name=Varchar()
     is_allowed=Boolean(default=False)
+    is_admin=Boolean(default=False)
     registration_date=Timestamptz()
     last_activity_date=Timestamptz()
 

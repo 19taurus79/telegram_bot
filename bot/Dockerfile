@@ -10,7 +10,7 @@ ENV USER=docker_user
 RUN addgroup -g ${GID} ${USER} \
     && adduser -S -u ${UID} -G ${USER} -D -h /home/${USER} ${USER}
 
-WORKDIR /home/${USER}/app
+WORKDIR /home/docker_user/app
 
 # Убедимся, что домашняя директория пользователя и рабочая директория принадлежат ему.
 # Эта команда должна быть здесь, чтобы гарантировать, что WORKDIR изначально принадлежит пользователю.
@@ -28,7 +28,7 @@ RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
 # --- ВАЖНОЕ ИЗМЕНЕНИЕ: КОПИРУЕМ ФАЙЛЫ И СРАЗУ МЕНЯЕМ ИХ ВЛАДЕЛЬЦА ---
-COPY .. .
+COPY . .
 # После копирования файлов (которые копируются как root),
 # рекурсивно меняем владельца всей рабочей директории на docker_user
 RUN chown -R ${USER}:${USER} /home/${USER}/app
@@ -37,4 +37,4 @@ RUN chown -R ${USER}:${USER} /home/${USER}/app
 # Теперь переключаемся на непривилегированного пользователя для всех последующих команд (CMD)
 USER ${USER}
 
-CMD ["python3", "-m", "bot"]
+CMD ["python", "main_bot.py"]

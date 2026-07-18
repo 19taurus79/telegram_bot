@@ -7,13 +7,13 @@ from aiogram.types import BotCommand
 from dotenv import load_dotenv
 
 # Импортируем роутеры
-from bot.handlers.comands import user_commands
-from bot.handlers.text_message import text_messages
-from bot.handlers import callback_handlers
+from handlers.comands import user_commands
+from handlers.text_message import text_messages
+from handlers.callbacks import callback_handlers
 
 # Импортируем наши мидлвари и функции для работы с БД пользователей
-from bot.middlewares.auth_middleware import AuthUserMiddleware, create_users_table
-from bot.middlewares.logging_middleware import LoggingMiddleware # Импортируем мидлварь логирования
+from middlewares.auth_middleware import AuthUserMiddleware, create_users_table
+from middlewares.logging_middleware import LoggingMiddleware # Импортируем мидлварь логирования
 
 # Загружаем переменные окружения из .env файла
 load_dotenv()

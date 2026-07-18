@@ -312,4 +312,11 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.toptal.com/developers/gitignore/api/windows,python,pycharm
+# End of https://www.toptal.com/developers/gitignore/api/windows,python,pycharm.env
+bot/nginx/
+nginx/certbot/
+.idea/
+.env
+bot/nginx/
+nginx/certbot/
+.idea/

@@ -1,63 +1,104 @@
-version: '3.8' # Это предупреждение можно игнорировать или удалить эту строку
+version: '3.8'
 
 services:
 
-  db:
-    image: postgres:15.6
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - pgdata:/var/lib/postgresql/data # Использует том pgdata
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
+#  db:
+#    image: postgres:15.6
+#    environment:
+#      POSTGRES_DB: ${POSTGRES_DB}
+#      POSTGRES_USER: ${POSTGRES_USER}
+#      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+#    volumes:
+#      - pgdata:/var/lib/postgresql/data
+#    # Порт 5432 для БД можно оставить, если вам нужен прямой доступ к БД с хоста
+#    # или если другие локальные инструменты его используют.
+#    # Если БД нужна только внутри Docker-сети, можно убрать.
+#    ports:
+#      - "5432:5432"
+#    restart: unless-stopped
 
   nginx:
-    image: nginx:stable-alpine
+    image: nginx:stable
+    container_name: project_bot-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "80:80"   # Публикуем HTTP порт на хост
+      - "443:443" # Публикуем HTTPS порт на хост
     volumes:
-#      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Монтируем папку с вашими Nginx конфигами
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./certbot/www:/var/www/certbot:ro
-      - /etc/letsencrypt/:/etc/letsencrypt/:ro
-    restart: unless-stopped
-
-  # --- НОВЫЙ СЕРВИС: eridon_bot ---
-  eridon_bot:
-    container_name: eridon_bot
-    build:
-      context: . # Путь к папке, где находится Dockerfile вашего бота
-      dockerfile: bot/Dockerfile
-    env_file:
-      - bot/.env # Переменные окружения для вашего бота
-    volumes:
-      - logging_data:/home/docker_user/app/log # Использует том logging_data
+      # Монтируем папки для Certbot
+      - ./nginx/certbot/conf:/etc/letsencrypt
+      - ./nginx/certbot/www:/var/www/certbot
     depends_on:
-      - db
+     # - eridon_api # Nginx зависит от API
+      - pgadmin  # Nginx зависит от PgAdmin
     restart: unless-stopped
-    # ports: # Раскомментируйте, если бот - это веб-приложение
+    
+  certbot:
+    build: ./certbot_config
+    volumes:
+      - ./nginx/certbot/conf:/etc/letsencrypt
+      - ./nginx/certbot/www:/var/www/certbot
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --deploy-hook 'docker exec project_bot-nginx nginx -s reload'; sleep 12h & wait $${!}; done;"
+    restart: unless-stopped
+#  eridon_bot:
+ #   container_name: eridon_bot_test
+ #   build:
+  #    context: ./bot
+   #   dockerfile: Dockerfile
+   # env_file:
+    #  - bot/.env
+   # volumes:
+    #  - logging_data:/home/docker_user/app/log
+   # depends_on:
+#      - db
+    #  - agri_api # Бот зависит от API
+      # - nginx # Если бот обращается к API через публичный домен (что редко), добавьте эту зависимость
+   # restart: unless-stopped
+   # environment:
+      # API_URL для бота должен использовать имя сервиса API внутри Docker-сети
+    #  API_URL: http://agri_api:8000
+
+ # agri_api:
+  #  container_name: agri_api_container_test
+   # build:
+   #   context: ./api
+   #   dockerfile: Dockerfile
+    # УДАЛИТЕ ИЛИ ЗАКОММЕНТИРУЙТЕ ЭТУ СТРОКУ, если доступ только через Nginx
+    # ports:
     #   - "8000:8000"
+   # environment:
+   #   DB_HOST: db # <-- ИСПРАВЛЕНО: имя сервиса БД в Docker Compose
+   #   DB_PORT: 5432
+   #   DB_NAME: ${POSTGRES_DB}
+   #   DB_USER: ${POSTGRES_USER}
+   #   DB_PASSWORD: ${POSTGRES_PASSWORD}
+#    depends_on:
+#      - db
+    #restart: unless-stopped
 
   pgadmin:
-    container_name: pgadmin_container
+    container_name: pgadmin_container_test
     image: dpage/pgadmin4
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD} # <-- Подтягиваем из .env
-      PGADMIN_LISTEN_PATH: /pgadmin/
-    ports:
-      - "5050:80"
-    depends_on:
-      - db
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_LISTEN_PATH: /pgadmin/ # Это внутренний путь PgAdmin, Nginx будет проксировать
+    # УДАЛИТЕ ИЛИ ЗАКОММЕНТИРУЙТЕ ЭТУ СТРОКУ, если доступ только через Nginx
+    # ports:
+    #   - "5050:80" # PgAdmin внутри контейнера слушает порт 80
+#    depends_on:
+#      - db
+    volumes: 
+        - pgadmin_data:/var/lib/pgadmin
     restart: unless-stopped
 
-# --- ОПРЕДЕЛЕНИЕ ВСЕХ ТОМОВ ---
-# Этот блок должен быть на том же уровне, что и 'services:'
 volumes:
-  pgdata:         # Определен том для PostgreSQL
-  logging_data:   # Определен том для логов eridon_bot
-  pgadmin_data:   # Определен том для данных PgAdmin
+#  pgdata:
+  logging_data:
+  pgadmin_data:
+networks:
+    default:
+        external:
+            name: shared_network

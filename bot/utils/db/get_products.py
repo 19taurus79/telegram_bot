@@ -1,4 +1,4 @@
-from bot.bot_tables import ProductGuide
+from bot_tables.tables import ProductGuide
 
 async def get_products(query: str):
     products = await ProductGuide.select().where(ProductGuide.product.ilike(f"%{query}%")).order_by(ProductGuide.product)
