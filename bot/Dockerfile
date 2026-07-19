@@ -23,12 +23,12 @@ RUN apk update \
     && apk add --no-cache gcc python3-dev musl-dev linux-headers \
     && rm -rf /var/cache/apk/*
 
-COPY requirements.txt ./
+COPY bot/requirements.txt ./
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
 # --- ВАЖНОЕ ИЗМЕНЕНИЕ: КОПИРУЕМ ФАЙЛЫ И СРАЗУ МЕНЯЕМ ИХ ВЛАДЕЛЬЦА ---
-COPY .. .
+COPY . .
 # После копирования файлов (которые копируются как root),
 # рекурсивно меняем владельца всей рабочей директории на docker_user
 RUN chown -R ${USER}:${USER} /home/${USER}/app
