@@ -37,4 +37,4 @@ RUN chown -R ${USER}:${USER} /home/${USER}/app
 # Теперь переключаемся на непривилегированного пользователя для всех последующих команд (CMD)
 USER ${USER}
 
-CMD ["python3", "-m", "bot"]
+CMD ["python3", "bot/main_bot.py"]
