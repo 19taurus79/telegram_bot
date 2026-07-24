@@ -17,7 +17,7 @@ WORKDIR /home/${USER}/app
 # Возможно, этот RUN был уже. Главное, что он создает /home/docker_user/app и устанавливает права
 RUN chown -R ${USER}:${USER} /home/${USER}/app
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/home/${USER}/app
 
 RUN apk update \
     && apk add --no-cache gcc python3-dev musl-dev linux-headers \
@@ -37,4 +37,4 @@ RUN chown -R ${USER}:${USER} /home/${USER}/app
 # Теперь переключаемся на непривилегированного пользователя для всех последующих команд (CMD)
 USER ${USER}
 
-CMD ["python3", "bot/main_bot.py"]
+CMD ["python3", "-m", "bot.main_bot"]
