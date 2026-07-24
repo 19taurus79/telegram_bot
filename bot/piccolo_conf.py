@@ -13,4 +13,4 @@ DB = PostgresEngine(
         "port": int(os.getenv("POSTGRES_PORT")),
     }
 )
-APP_REGISTRY = AppRegistry(apps=["bot_tables.piccolo_app"])
+APP_REGISTRY = AppRegistry(apps=["bot.bot_tables.piccolo_app"])
